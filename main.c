@@ -15,8 +15,10 @@ typedef struct {
 
 int rows = HEIGHT / RESOLUTION, cols = WIDTH / RESOLUTION;
 int state = 0;
+int colorized = 1;
 
 void updateGrid(Cel grid[rows][cols], Cel calc[rows][cols], float time);
+void updateGridColor(Cel grid[rows][cols], Cel calc[rows][cols], float time);
 void copyGrid(Cel grid[rows][cols], Cel calc[rows][cols]);
 int countNeighbors(int x, int y, Cel grid[rows][cols]);
 float lerp(float init, float end, float amount);
@@ -51,7 +53,10 @@ int main() {
 
 		float delta = GetFrameTime();
 
-		if (state) updateGrid(grid, gridCalc, delta);
+		if (state) {
+			if (colorized) updateGridColor(grid, gridCalc, delta);
+			else updateGrid(grid, gridCalc, delta);
+		}
 
 		if (IsKeyPressed(KEY_SPACE)) {
 			state = !state;
@@ -65,6 +70,10 @@ int main() {
 		if (IsKeyPressed(KEY_N)) {
 			state = 0;
 			clearGrid(grid, gridCalc);
+		}
+
+		if (IsKeyPressed(KEY_C)) {
+			colorized = !colorized;
 		}
 
 		if (IsMouseButtonDown(MOUSE_LEFT_BUTTON) && !state) {
@@ -83,7 +92,11 @@ int main() {
 
 		for (int i = 0; i < rows; ++i) {
 			for (int j = 0; j < cols; ++j) {
-				DrawRectangle(i * RESOLUTION, j * RESOLUTION, RESOLUTION, RESOLUTION, gridCalc[i][j].color);
+				if (colorized) {
+					DrawRectangle(i * RESOLUTION, j * RESOLUTION, RESOLUTION, RESOLUTION, gridCalc[i][j].color);
+				} else {
+					if (gridCalc[i][j].value == 1) DrawRectangle(i * RESOLUTION, j * RESOLUTION, RESOLUTION, RESOLUTION, WHITE);
+				}
 			}
 		}
 
@@ -131,7 +144,7 @@ void randomGrid(Cel grid[rows][cols], Cel calc[rows][cols]) {
 	}
 }
 
-void updateGrid(Cel grid[rows][cols], Cel calc[rows][cols], float time) {
+void updateGridColor(Cel grid[rows][cols], Cel calc[rows][cols], float time) {
 	for (int i = 0; i < rows; ++i) {
 		for (int j = 0; j < cols; ++j) {
 
@@ -155,12 +168,34 @@ void updateGrid(Cel grid[rows][cols], Cel calc[rows][cols], float time) {
 				if (calc[i][j].color.r <= deadColor.r && calc[i][j].color.g <= deadColor.g && calc[i][j].color.b <= deadColor.b) {
 					calc[i][j].color = colorLerp(calc[i][j].color, background, time / 2);
 				} else {
-					calc[i][j].color = colorLerp(calc[i][j].color, deadColor, time);
+					calc[i][j].color = colorLerp(calc[i][j].color, deadColor, time * 2);
 				}
 			} else if (calc[i][j].value == 1) {
 				calc[i][j].color = liveColor;
 			} else {
 				calc[i][j].color = background;
+			}
+		}
+	}
+}
+
+void updateGrid(Cel grid[rows][cols], Cel calc[rows][cols], float time) {
+	for (int i = 0; i < rows; ++i) {
+		for (int j = 0; j < cols; ++j) {
+
+			if (i == 0 || i == rows - 1 || j == 0 || j == cols - 1) {
+				calc[i][j].value = -1;
+			} else {
+				int sum = countNeighbors(i, j, grid);
+				Cel cel = grid[i][j];
+
+				if (cel.value == 1 && (sum < 2 || sum > 3)) {
+					calc[i][j].value = 0;
+				} else if ((cel.value == 0 || cel.value == -1) && sum == 3) {
+					calc[i][j].value = 1;
+				} else {
+					calc[i][j].value = cel.value;
+				}
 			}
 		}
 	}
